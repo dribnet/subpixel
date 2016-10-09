@@ -20,7 +20,7 @@ class DCGAN(object):
                  batch_size=64, image_shape=[128, 128, 3],
                  y_dim=None, z_dim=100, gf_dim=64, df_dim=64,
                  gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',
-                 checkpoint_dir=None):
+                 checkpoint_dir=None, mid_epoch=True):
         """
 
         Args:
@@ -41,6 +41,8 @@ class DCGAN(object):
         self.input_size = 32
         self.sample_size = batch_size
         self.image_shape = image_shape
+        self.mid_epoch = mid_epoch
+        self.have_saved_inputs = False
 
         self.y_dim = y_dim
         self.z_dim = z_dim
@@ -86,6 +88,21 @@ class DCGAN(object):
 
         self.saver = tf.train.Saver()
 
+    def run_validate(self, sample_images, sample_input_images, epoch, idx=None):
+        samples, g_loss, up_inputs = self.sess.run(
+            [self.G, self.g_loss, self.up_inputs],
+            feed_dict={self.inputs: sample_input_images, self.images: sample_images}
+        )
+        if not self.have_saved_inputs:
+            save_images(up_inputs, [8, 8], './samples/inputs.png')
+            self.have_saved_inputs = True
+        if idx is None:
+            filename = './samples/valid_{:03}.png'.format(epoch)
+        else:
+            filename = './samples/valid_{:03}_{:04}.png'.format(epoch, idx)
+        save_images(samples, [8, 8], filename)
+        print("[Sample] g_loss: %.8f" % (g_loss))
+
     def train(self, config):
         """Train DCGAN"""
         # first setup validation data
@@ -116,13 +133,11 @@ class DCGAN(object):
         else:
             print(" [!] Load failed...")
 
-        # we only save the validation inputs once
-        have_saved_inputs = False
-
         for epoch in xrange(config.epoch):
             data = sorted(glob(os.path.join("./data", config.dataset, "train", "*.jpg")))
             batch_idxs = min(len(data), config.train_size) // config.batch_size
 
+            self.run_validate(sample_images, sample_input_images, epoch)
             for idx in xrange(0, batch_idxs):
                 batch_files = data[idx*config.batch_size:(idx+1)*config.batch_size]
                 batch = [get_image(batch_file, self.image_size, is_crop=self.is_crop) for batch_file in batch_files]
@@ -140,20 +155,15 @@ class DCGAN(object):
                     % (epoch, idx, batch_idxs,
                         time.time() - start_time, errG))
 
-                if np.mod(counter, 100) == 1:
-                    samples, g_loss, up_inputs = self.sess.run(
-                        [self.G, self.g_loss, self.up_inputs],
-                        feed_dict={self.inputs: sample_input_images, self.images: sample_images}
-                    )
-                    if not have_saved_inputs:
-                        save_images(up_inputs, [8, 8], './samples/inputs.png')
-                        have_saved_inputs = True
-                    save_images(samples, [8, 8],
-                                './samples/valid_%s_%s.png' % (epoch, idx))
-                    print("[Sample] g_loss: %.8f" % (g_loss))
+                if self.mid_epoch and np.mod(counter, 100) == 1:
+                    self.run_validate(sample_images, sample_input_images, epoch, idx)
 
                 if np.mod(counter, 500) == 2:
                     self.save(config.checkpoint_dir, counter)
+
+        # final validation
+        self.run_validate(sample_images, sample_input_images, epoch)
+
 
     def generator(self, z):
         # project `z` and reshape
