@@ -22,7 +22,7 @@ def save_images(images, size, image_path):
     return imsave(inverse_transform(images[:num_im]), size, image_path)
 
 def imread(path):
-    return scipy.misc.imread(path).astype(np.float)
+    return scipy.misc.imread(path, mode='RGB').astype(np.float)
 
 def merge_images(images, size):
     return inverse_transform(images)

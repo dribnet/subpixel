@@ -20,7 +20,7 @@ class DCGAN(object):
                  batch_size=64, image_shape=[128, 128, 3],
                  y_dim=None, z_dim=100, gf_dim=64, df_dim=64,
                  gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',
-                 checkpoint_dir=None, mid_epoch=True):
+                 checkpoint_dir=None, sample_dir=None, mid_epoch=True):
         """
 
         Args:
@@ -57,6 +57,7 @@ class DCGAN(object):
 
         self.dataset_name = dataset_name
         self.checkpoint_dir = checkpoint_dir
+        self.sample_dir = sample_dir
         self.build_model()
 
     def build_model(self):
@@ -94,19 +95,20 @@ class DCGAN(object):
             feed_dict={self.inputs: sample_input_images, self.images: sample_images}
         )
         if not self.have_saved_inputs:
-            save_images(up_inputs, [8, 8], './samples/inputs.png')
+            save_images(up_inputs, [8, 8], os.path.join(self.sample_dir, "inputs.png"))
             self.have_saved_inputs = True
         if idx is None:
-            filename = './samples/valid_{:03}.png'.format(epoch)
+            filename = os.path.join(self.sample_dir, 'valid_{:03}.png'.format(epoch))
         else:
-            filename = './samples/valid_{:03}_{:04}.png'.format(epoch, idx)
+            filename = os.path.join(self.sample_dir, 'valid_{:03}_{:04}.png'.format(epoch, idx))
         save_images(samples, [8, 8], filename)
         print("[Sample] g_loss: %.8f" % (g_loss))
 
     def train(self, config):
         """Train DCGAN"""
         # first setup validation data
-        data = sorted(glob(os.path.join("./data", config.dataset, "valid", "*.jpg")))
+        data_large = sorted(glob(os.path.join("./data", config.dataset, "large/valid", "*.png")))
+        data_small = sorted(glob(os.path.join("./data", config.dataset, "small/valid", "*.png")))
 
         g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
                           .minimize(self.g_loss, var_list=self.g_vars)
@@ -116,14 +118,15 @@ class DCGAN(object):
         self.g_sum = tf.merge_summary([self.G_sum, self.g_loss_sum])
         self.writer = tf.train.SummaryWriter("./logs", self.sess.graph)
 
-        sample_files = data[0:self.sample_size]
-        sample = [get_image(sample_file, self.image_size, is_crop=self.is_crop) for sample_file in sample_files]
-        sample_inputs = [doresize(xx, [self.input_size,]*2) for xx in sample]
+        sample_files_large = data_large[0:self.sample_size]
+        sample_files_small = data_small[0:self.sample_size]
+        sample = [get_image(sample_file, self.image_size, is_crop=False) for sample_file in sample_files_large]
+        sample_inputs = [get_image(sample_file, self.input_size, is_crop=False) for sample_file in sample_files_small]
         sample_images = np.array(sample).astype(np.float32)
         sample_input_images = np.array(sample_inputs).astype(np.float32)
 
-        save_images(sample_input_images, [8, 8], './samples/inputs_small.png')
-        save_images(sample_images, [8, 8], './samples/reference.png')
+        save_images(sample_input_images, [8, 8], os.path.join(self.sample_dir, "inputs_small.png"))
+        save_images(sample_images, [8, 8], os.path.join(self.sample_dir, "reference.png"))
 
         counter = 1
         start_time = time.time()
@@ -134,14 +137,16 @@ class DCGAN(object):
             print(" [!] Load failed...")
 
         for epoch in xrange(config.epoch):
-            data = sorted(glob(os.path.join("./data", config.dataset, "train", "*.jpg")))
-            batch_idxs = min(len(data), config.train_size) // config.batch_size
+            data_large = sorted(glob(os.path.join("./data", config.dataset, "large/train", "*.png")))
+            data_small = sorted(glob(os.path.join("./data", config.dataset, "small/train", "*.png")))
+            batch_idxs = min(len(data_large), config.train_size) // config.batch_size
 
             self.run_validate(sample_images, sample_input_images, epoch)
             for idx in xrange(0, batch_idxs):
-                batch_files = data[idx*config.batch_size:(idx+1)*config.batch_size]
-                batch = [get_image(batch_file, self.image_size, is_crop=self.is_crop) for batch_file in batch_files]
-                input_batch = [doresize(xx, [self.input_size,]*2) for xx in batch]
+                batch_files_large = data_large[idx*config.batch_size:(idx+1)*config.batch_size]
+                batch_files_small = data_small[idx*config.batch_size:(idx+1)*config.batch_size]
+                batch = [get_image(batch_file, self.image_size, is_crop=False) for batch_file in batch_files_large]
+                input_batch = [get_image(batch_file, self.input_size, is_crop=False) for batch_file in batch_files_small]
                 batch_images = np.array(batch).astype(np.float32)
                 batch_inputs = np.array(input_batch).astype(np.float32)
 
