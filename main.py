@@ -21,6 +21,8 @@ flags.DEFINE_boolean("is_train", False, "True for training, False for testing [F
 flags.DEFINE_boolean("is_crop", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
 flags.DEFINE_boolean("mid_epoch", True, "True to output results before epoch ends [True]")
+flags.DEFINE_string("large_data_path", None, "Directory for large data splits")
+flags.DEFINE_string("small_data_path", None, "Directory for small data splits")
 FLAGS = flags.FLAGS
 
 def main(_):
@@ -39,7 +41,8 @@ def main(_):
         else:
             dcgan = DCGAN(sess, image_size=FLAGS.image_size, batch_size=FLAGS.batch_size,
                     dataset_name=FLAGS.dataset, is_crop=FLAGS.is_crop, checkpoint_dir=FLAGS.checkpoint_dir,
-                    sample_dir = FLAGS.sample_dir, mid_epoch = FLAGS.mid_epoch)
+                    sample_dir = FLAGS.sample_dir, mid_epoch = FLAGS.mid_epoch,
+                    large_data_path = FLAGS.large_data_path, small_data_path = FLAGS.small_data_path)
 
         if FLAGS.is_train:
             dcgan.train(FLAGS)

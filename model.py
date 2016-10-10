@@ -20,7 +20,8 @@ class DCGAN(object):
                  batch_size=64, image_shape=[128, 128, 3],
                  y_dim=None, z_dim=100, gf_dim=64, df_dim=64,
                  gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',
-                 checkpoint_dir=None, sample_dir=None, mid_epoch=True):
+                 checkpoint_dir=None, sample_dir=None, mid_epoch=True,
+                 large_data_path=None, small_data_path=None):
         """
 
         Args:
@@ -58,6 +59,17 @@ class DCGAN(object):
         self.dataset_name = dataset_name
         self.checkpoint_dir = checkpoint_dir
         self.sample_dir = sample_dir
+
+        if large_data_path is None:
+            self.large_data_path = os.path.join(".", "data", self.dataset_name, "large")
+        else:
+            self.large_data_path = large_data_path
+
+        if small_data_path is None:
+            self.small_data_path = os.path.join(".", "data", self.dataset_name, "small")
+        else:
+            self.small_data_path = small_data_path
+
         self.build_model()
 
     def build_model(self):
@@ -107,8 +119,8 @@ class DCGAN(object):
     def train(self, config):
         """Train DCGAN"""
         # first setup validation data
-        data_large = sorted(glob(os.path.join("./data", config.dataset, "large/valid", "*.png")))
-        data_small = sorted(glob(os.path.join("./data", config.dataset, "small/valid", "*.png")))
+        data_large = sorted(glob(os.path.join(self.large_data_path, "valid", "*.png")))
+        data_small = sorted(glob(os.path.join(self.small_data_path, "valid", "*.png")))
 
         g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
                           .minimize(self.g_loss, var_list=self.g_vars)
@@ -137,8 +149,8 @@ class DCGAN(object):
             print(" [!] Load failed...")
 
         for epoch in xrange(config.epoch):
-            data_large = sorted(glob(os.path.join("./data", config.dataset, "large/train", "*.png")))
-            data_small = sorted(glob(os.path.join("./data", config.dataset, "small/train", "*.png")))
+            data_large = sorted(glob(os.path.join(self.large_data_path, "train", "*.png")))
+            data_small = sorted(glob(os.path.join(self.small_data_path, "train", "*.png")))
             batch_idxs = min(len(data_large), config.train_size) // config.batch_size
 
             self.run_validate(sample_images, sample_input_images, epoch)
