@@ -13,7 +13,8 @@ flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam [0.0002]"
 flags.DEFINE_float("beta1", 0.5, "Momentum term of adam [0.5]")
 flags.DEFINE_integer("train_size", np.inf, "The size of train images [np.inf]")
 flags.DEFINE_integer("batch_size", 64, "The size of batch images [64]")
-flags.DEFINE_integer("image_size", 128, "The size of image to use (will be center cropped) [108]")
+flags.DEFINE_integer("image_size", 128, "The size of image to use (will be center cropped) [128]")
+flags.DEFINE_integer("input_size", 32, "The size of input images [32]")
 flags.DEFINE_string("dataset", "celebA", "The name of dataset [celebA, mnist, lsun]")
 flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the checkpoints [checkpoint]")
 flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image samples [samples]")
@@ -21,6 +22,7 @@ flags.DEFINE_boolean("is_train", False, "True for training, False for testing [F
 flags.DEFINE_boolean("is_crop", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
 flags.DEFINE_boolean("mid_epoch", True, "True to output results before epoch ends [True]")
+flags.DEFINE_integer("report_freq", 100, "Mid epoch batch report frequency [100]")
 flags.DEFINE_string("large_data_path", None, "Directory for large data splits")
 flags.DEFINE_string("small_data_path", None, "Directory for small data splits")
 FLAGS = flags.FLAGS
@@ -39,7 +41,8 @@ def main(_):
                     dataset_name=FLAGS.dataset, is_crop=FLAGS.is_crop, checkpoint_dir=FLAGS.checkpoint_dir,
                     sample_dir = FLAGS.sample_dir, mid_epoch = FLAGS.mid_epoch)
         else:
-            dcgan = DCGAN(sess, image_size=FLAGS.image_size, batch_size=FLAGS.batch_size,
+            dcgan = DCGAN(sess, image_size=FLAGS.image_size, input_size=FLAGS.input_size,
+                    batch_size=FLAGS.batch_size, report_freq=FLAGS.report_freq,
                     dataset_name=FLAGS.dataset, is_crop=FLAGS.is_crop, checkpoint_dir=FLAGS.checkpoint_dir,
                     sample_dir = FLAGS.sample_dir, mid_epoch = FLAGS.mid_epoch,
                     large_data_path = FLAGS.large_data_path, small_data_path = FLAGS.small_data_path)

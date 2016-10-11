@@ -16,8 +16,8 @@ def doresize(x, shape):
     return y
 
 class DCGAN(object):
-    def __init__(self, sess, image_size=128, is_crop=True,
-                 batch_size=64, image_shape=[128, 128, 3],
+    def __init__(self, sess, image_size=128, input_size=32, is_crop=True,
+                 batch_size=64, report_freq=100,
                  y_dim=None, z_dim=100, gf_dim=64, df_dim=64,
                  gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',
                  checkpoint_dir=None, sample_dir=None, mid_epoch=True,
@@ -39,10 +39,11 @@ class DCGAN(object):
         self.is_crop = is_crop
         self.batch_size = batch_size
         self.image_size = image_size
-        self.input_size = 32
+        self.input_size = input_size
         self.sample_size = batch_size
-        self.image_shape = image_shape
+        self.image_shape = [self.image_size, self.image_size, 3]
         self.mid_epoch = mid_epoch
+        self.report_freq = report_freq
         self.have_saved_inputs = False
 
         self.y_dim = y_dim
@@ -110,9 +111,9 @@ class DCGAN(object):
             save_images(up_inputs, [8, 8], os.path.join(self.sample_dir, "inputs.png"))
             self.have_saved_inputs = True
         if idx is None:
-            filename = os.path.join(self.sample_dir, 'valid_{:03}.png'.format(epoch))
+            filename = os.path.join(self.sample_dir, 'epoch_{:03}.png'.format(epoch))
         else:
-            filename = os.path.join(self.sample_dir, 'valid_{:03}_{:04}.png'.format(epoch, idx))
+            filename = os.path.join(self.sample_dir, 'epoch_{:03}_{:04}.png'.format(epoch, idx))
         save_images(samples, [8, 8], filename)
         print("[Sample] g_loss: %.8f" % (g_loss))
 
@@ -140,7 +141,6 @@ class DCGAN(object):
         save_images(sample_input_images, [8, 8], os.path.join(self.sample_dir, "inputs_small.png"))
         save_images(sample_images, [8, 8], os.path.join(self.sample_dir, "reference.png"))
 
-        counter = 1
         start_time = time.time()
 
         if self.load(self.checkpoint_dir):
@@ -149,6 +149,7 @@ class DCGAN(object):
             print(" [!] Load failed...")
 
         for epoch in xrange(config.epoch):
+            counter = 0
             data_large = sorted(glob(os.path.join(self.large_data_path, "train", "*.png")))
             data_small = sorted(glob(os.path.join(self.small_data_path, "train", "*.png")))
             batch_idxs = min(len(data_large), config.train_size) // config.batch_size
@@ -167,16 +168,17 @@ class DCGAN(object):
                     feed_dict={ self.inputs: batch_inputs, self.images: batch_images })
                 self.writer.add_summary(summary_str, counter)
 
-                counter += 1
                 print("Epoch: [%2d] [%4d/%4d] time: %4.4f, g_loss: %.8f" \
                     % (epoch, idx, batch_idxs,
                         time.time() - start_time, errG))
 
-                if self.mid_epoch and np.mod(counter, 100) == 1:
+                if self.mid_epoch and np.mod(counter, self.report_freq) == 0:
                     self.run_validate(sample_images, sample_input_images, epoch, idx)
 
                 if np.mod(counter, 500) == 2:
                     self.save(config.checkpoint_dir, counter)
+
+                counter += 1
 
         # final validation
         self.run_validate(sample_images, sample_input_images, epoch)
@@ -184,13 +186,13 @@ class DCGAN(object):
 
     def generator(self, z):
         # project `z` and reshape
-        self.h0, self.h0_w, self.h0_b = deconv2d(z, [self.batch_size, 32, 32, self.gf_dim], k_h=1, k_w=1, d_h=1, d_w=1, name='g_h0', with_w=True)
+        self.h0, self.h0_w, self.h0_b = deconv2d(z, [self.batch_size, self.input_size, self.input_size, self.gf_dim], k_h=1, k_w=1, d_h=1, d_w=1, name='g_h0', with_w=True)
         h0 = lrelu(self.h0)
 
-        self.h1, self.h1_w, self.h1_b = deconv2d(h0, [self.batch_size, 32, 32, self.gf_dim], name='g_h1', d_h=1, d_w=1, with_w=True)
+        self.h1, self.h1_w, self.h1_b = deconv2d(h0, [self.batch_size, self.input_size, self.input_size, self.gf_dim], name='g_h1', d_h=1, d_w=1, with_w=True)
         h1 = lrelu(self.h1)
 
-        h2, self.h2_w, self.h2_b = deconv2d(h1, [self.batch_size, 32, 32, 3*16], d_h=1, d_w=1, name='g_h2', with_w=True)
+        h2, self.h2_w, self.h2_b = deconv2d(h1, [self.batch_size, self.input_size, self.input_size, 3*16], d_h=1, d_w=1, name='g_h2', with_w=True)
         h2 = PS(h2, 4, color=True)
 
         return tf.nn.tanh(h2)
